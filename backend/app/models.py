@@ -1,7 +1,8 @@
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal
 
-from pydantic import EmailStr
+from pydantic import EmailStr, computed_field
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -70,6 +71,8 @@ class UsersPublic(SQLModel):
 class ItemBase(SQLModel):
     title: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=255)
+    price: Decimal | None = Field(default=None, ge=0, max_digits=10, decimal_places=2)
+    discount_percent: int = Field(default=0, ge=0, lt=100)
 
 
 # Properties to receive on item creation
@@ -81,6 +84,8 @@ class ItemCreate(ItemBase):
 class ItemUpdate(SQLModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=255)
+    price: Decimal | None = Field(default=None, max_digits=10, decimal_places=2)
+    discount_percent: int | None = Field(default=None, ge=0, lt=100)
 
 
 # Database model, database table inferred from class name
@@ -98,6 +103,13 @@ class ItemPublic(ItemBase):
     id: uuid.UUID
     owner_id: uuid.UUID
     created_at: datetime | None = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def final_price(self) -> Decimal | None:
+        if self.price is None:
+            return None
+        return round(self.price * (100 - self.discount_percent) / 100, 2)
 
 
 class ItemsPublic(SQLModel):
