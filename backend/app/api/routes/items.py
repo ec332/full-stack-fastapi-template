@@ -100,6 +100,8 @@ def update_item(
         raise HTTPException(status_code=403, detail="Not enough permissions")
     _check_title(item_in.title)
     update_dict = item_in.model_dump(exclude_unset=True)
+    if "title" in update_dict and update_dict["title"] is None:
+        raise HTTPException(status_code=422, detail="Title is required")
     item.sqlmodel_update(update_dict)
     session.add(item)
     session.commit()
