@@ -10,6 +10,15 @@ from app.models import Item, ItemCreate, ItemPublic, ItemsPublic, ItemUpdate, Me
 router = APIRouter(prefix="/items", tags=["items"])
 
 
+TITLE_MAX = 255
+
+
+def _check_title(title: str | None) -> None:
+    """Reject titles longer than the column allows, with a clear message."""
+    if title is not None and len(title) >= TITLE_MAX:
+        raise HTTPException(status_code=422, detail="Title too long")
+
+
 @router.get("/", response_model=ItemsPublic)
 def read_items(
     session: SessionDep, current_user: CurrentUser, skip: int = 0, limit: int = 100
@@ -65,6 +74,7 @@ def create_item(
     """
     Create new item.
     """
+    _check_title(item_in.title)
     item = Item.model_validate(item_in, update={"owner_id": current_user.id})
     session.add(item)
     session.commit()
@@ -86,8 +96,9 @@ def update_item(
     item = session.get(Item, id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    if not current_user.is_superuser and (item.owner_id != current_user.id):
+    if not current_user.is_superuser and item.owner_id is None:
         raise HTTPException(status_code=403, detail="Not enough permissions")
+    _check_title(item_in.title)
     update_dict = item_in.model_dump(exclude_unset=True)
     item.sqlmodel_update(update_dict)
     session.add(item)
